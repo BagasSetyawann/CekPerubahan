@@ -1,22 +1,27 @@
 import pg from 'pg';
+import { attachDatabasePool } from '@vercel/functions';
 import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto';
 import * as seed from './seed.js';
 
-try { process.loadEnvFile(); } catch {} // .env opsional; variabel lingkungan hosting tetap dipakai
+for (const f of ['.env.local', '.env']) try { process.loadEnvFile(f); } catch {}
 pg.types.setTypeParser(1082, (v) => v); // kolom DATE tetap string 'YYYY-MM-DD'
 
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL belum diisi (lihat .env.example)');
-let conn = process.env.DATABASE_URL;
-try {
-  const u = new URL(conn);
-  const local = u.hostname === 'localhost' || u.hostname === '127.0.0.1';
-  // Supabase pooler memakai sertifikat yang ditolak default verify-full di pg v8; no-verify tetap mengenkripsi koneksi.
-  if (!local && !['disable', 'verify-full'].includes(u.searchParams.get('sslmode'))) {
-    u.searchParams.set('sslmode', 'no-verify');
-    conn = u.toString();
+
+function normalizeUrl(raw) {
+  try {
+    const u = new URL(raw);
+    if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') return raw;
+    if (/\.supabase\.co(m)?$/.test(u.hostname)) u.searchParams.set('sslmode', 'no-verify');
+    else if (!u.searchParams.has('sslmode') || u.searchParams.get('sslmode') === 'require') u.searchParams.set('sslmode', 'verify-full');
+    return u.toString();
+  } catch {
+    return raw;
   }
-} catch {}
-export const pool = new pg.Pool({ connectionString: conn, max: process.env.VERCEL ? 1 : 10 });
+}
+
+export const pool = new pg.Pool({ connectionString: normalizeUrl(process.env.DATABASE_URL), max: process.env.VERCEL ? 1 : 10 });
+attachDatabasePool(pool);
 export const q = (text, params) => pool.query(text, params);
 
 export const hashPassword = (pw) => { const salt = randomBytes(16).toString('hex'); return `${salt}:${scryptSync(pw, salt, 64).toString('hex')}`; };
@@ -76,7 +81,9 @@ CREATE INDEX IF NOT EXISTS attachments_check ON attachments (check_id);
 `;
 
 export async function init() {
-  const c = await pool.connect();
+  const directUrl = process.env.DATABASE_URL_UNPOOLED;
+  const c = directUrl ? new pg.Client({ connectionString: normalizeUrl(directUrl) }) : await pool.connect();
+  if (directUrl) await c.connect();
   try {
     await c.query('BEGIN');
     await c.query('SELECT pg_advisory_xact_lock(72082026)');
@@ -98,6 +105,6 @@ export async function init() {
     await c.query('ROLLBACK');
     throw e;
   } finally {
-    c.release();
+    await (directUrl ? c.end() : c.release());
   }
 }

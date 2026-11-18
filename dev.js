@@ -13,6 +13,7 @@ await pg.start();
 await pg.createDatabase('manper').catch(() => {}); // sudah ada
 
 process.env.DATABASE_URL ||= 'postgres://postgres:postgres@localhost:5433/manper';
+process.env.DATABASE_URL_UNPOOLED ||= process.env.DATABASE_URL;
 process.env.INIT_USERNAME ||= 'admin';
 process.env.INIT_PASSWORD ||= 'admin12345';
 process.env.INIT_NAME ||= 'Administrator';

@@ -33,6 +33,7 @@ app.use((req, res, next) => {
 });
 app.use(express.json({ limit: '100kb' }));
 app.use(express.static(join(import.meta.dirname, 'public')));
+app.get('/', (req, res) => res.redirect('/index.html')); // fallback di Vercel jika static public/ dilewati ke fungsi
 app.use('/api', (req, res, next) => ensureInit().then(() => next(), next));
 
 // ---------- Masuk / keluar ----------

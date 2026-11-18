@@ -2,13 +2,19 @@
   "name": "ceklis-manajemen-perubahan",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20.12" },
+  "engines": {
+    "node": ">=20.12"
+  },
   "scripts": {
+    "build": "node --check db.js && node --check server.js && node --check periods.js && node --check seed.js && node --check public/app.js",
     "start": "node server.js",
     "dev": "node dev.js",
     "test": "node --test"
   },
   "dependencies": {
+    "@neon/config": "^1.14.3",
+    "@neon/env": "^2.1.6",
+    "@vercel/functions": "^3.11.3",
     "exceljs": "^4.4.0",
     "express": "^5.1.0",
     "multer": "^2.0.2",
