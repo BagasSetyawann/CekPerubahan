@@ -24,6 +24,7 @@ class ApiError extends Error {}
 async function api(path, { method = 'GET', body } = {}) {
   const json = body && !(body instanceof FormData);
   const res = await fetch('/api' + path, { method, body: json ? JSON.stringify(body) : body, headers: json ? { 'Content-Type': 'application/json' } : {} });
+  if (res.status === 413) throw new ApiError('Total ukuran lampiran terlalu besar untuk server (maks. sekitar 4 MB sekali kirim). Perkecil atau unggah satu per satu.');
   const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
   if (res.status === 401 && path !== '/login') { showLogin(); throw new ApiError('Sesi berakhir. Silakan masuk lagi.'); }
   if (!res.ok) throw Object.assign(new ApiError(data?.error || 'Permintaan gagal. Coba lagi.'), { field: data?.field });

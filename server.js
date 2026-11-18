@@ -2,12 +2,15 @@ import express from 'express';
 import multer from 'multer';
 import ExcelJS from 'exceljs';
 import { randomBytes } from 'node:crypto';
+import { join } from 'node:path';
 import { q, pool, init, hashPassword, checkPassword } from './db.js';
 import { FREQ, today, isDate, fmtDate, periodOf, evaluate } from './periods.js';
 
 const app = express();
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
+let ready;
+const ensureInit = () => (ready ||= init().catch((e) => { ready = null; throw e; }));
 
 const fail = (status, message, field) => Object.assign(new Error(message), { status, field });
 const num = (v) => { const n = Number(v); if (!Number.isInteger(n)) throw fail(404, 'Data tidak ditemukan'); return n; };
@@ -29,7 +32,8 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: '100kb' }));
-app.use(express.static('public'));
+app.use(express.static(join(import.meta.dirname, 'public')));
+app.use('/api', (req, res, next) => ensureInit().then(() => next(), next));
 
 // ---------- Masuk / keluar ----------
 const cookies = (req) => Object.fromEntries((req.headers.cookie || '').split(';').map((c) => c.trim().split('=')).filter(([k]) => k).map(([k, ...v]) => [k, decodeURIComponent(v.join('='))]));
@@ -374,6 +378,10 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Terjadi kesalahan di server. Coba lagi.' });
 });
 
-await init();
-const port = Number(process.env.PORT) || 3000;
-app.listen(port, () => console.log(`Aplikasi berjalan di http://localhost:${port}`));
+if (!process.env.VERCEL) {
+  await ensureInit();
+  const port = Number(process.env.PORT) || 3000;
+  app.listen(port, () => console.log(`Aplikasi berjalan di http://localhost:${port}`));
+}
+
+export default app;

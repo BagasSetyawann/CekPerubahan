@@ -6,7 +6,17 @@ try { process.loadEnvFile(); } catch {} // .env opsional; variabel lingkungan ho
 pg.types.setTypeParser(1082, (v) => v); // kolom DATE tetap string 'YYYY-MM-DD'
 
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL belum diisi (lihat .env.example)');
-export const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+let conn = process.env.DATABASE_URL;
+try {
+  const u = new URL(conn);
+  const local = u.hostname === 'localhost' || u.hostname === '127.0.0.1';
+  // Supabase pooler memakai sertifikat yang ditolak default verify-full di pg v8; no-verify tetap mengenkripsi koneksi.
+  if (!local && !['disable', 'verify-full'].includes(u.searchParams.get('sslmode'))) {
+    u.searchParams.set('sslmode', 'no-verify');
+    conn = u.toString();
+  }
+} catch {}
+export const pool = new pg.Pool({ connectionString: conn, max: process.env.VERCEL ? 1 : 10 });
 export const q = (text, params) => pool.query(text, params);
 
 export const hashPassword = (pw) => { const salt = randomBytes(16).toString('hex'); return `${salt}:${scryptSync(pw, salt, 64).toString('hex')}`; };
@@ -66,17 +76,28 @@ CREATE INDEX IF NOT EXISTS attachments_check ON attachments (check_id);
 `;
 
 export async function init() {
-  await q(schema);
-  if ((await q('SELECT 1 FROM activities LIMIT 1')).rowCount === 0) {
-    for (const a of seed.activities)
-      await q('INSERT INTO activities (name, frequency, target, description, plan, output, outcome) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-        [a.name, a.frequency, a.target, a.description, a.plan, a.output, a.outcome]);
-    for (const [date, name] of seed.holidays)
-      await q('INSERT INTO holidays (date, name) VALUES ($1,$2) ON CONFLICT DO NOTHING', [date, name]);
-  }
-  const { INIT_USERNAME: u, INIT_PASSWORD: p, INIT_NAME: n } = process.env;
-  if (u && p && (await q('SELECT 1 FROM users LIMIT 1')).rowCount === 0) {
-    await q('INSERT INTO users (username, name, password_hash) VALUES ($1,$2,$3)', [u.toLowerCase(), n || u, hashPassword(p)]);
-    console.log(`Akun pertama "${u}" dibuat.`);
+  const c = await pool.connect();
+  try {
+    await c.query('BEGIN');
+    await c.query('SELECT pg_advisory_xact_lock(72082026)');
+    await c.query(schema);
+    if ((await c.query('SELECT 1 FROM activities LIMIT 1')).rowCount === 0) {
+      for (const a of seed.activities)
+        await c.query('INSERT INTO activities (name, frequency, target, description, plan, output, outcome) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+          [a.name, a.frequency, a.target, a.description, a.plan, a.output, a.outcome]);
+      for (const [date, name] of seed.holidays)
+        await c.query('INSERT INTO holidays (date, name) VALUES ($1,$2) ON CONFLICT DO NOTHING', [date, name]);
+    }
+    const { INIT_USERNAME: u, INIT_PASSWORD: p, INIT_NAME: n } = process.env;
+    if (u && p && (await c.query('SELECT 1 FROM users LIMIT 1')).rowCount === 0) {
+      await c.query('INSERT INTO users (username, name, password_hash) VALUES ($1,$2,$3)', [u.toLowerCase(), n || u, hashPassword(p)]);
+      console.log(`Akun pertama "${u}" dibuat.`);
+    }
+    await c.query('COMMIT');
+  } catch (e) {
+    await c.query('ROLLBACK');
+    throw e;
+  } finally {
+    c.release();
   }
 }
