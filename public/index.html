@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ceklis Manajemen Perubahan: BPS Kabupaten Parigi Moutong</title>
+  <meta name="description" content="Pencatatan pelaksanaan program manajemen perubahan per periode, lengkap dengan bukti dan laporan kepatuhan.">
+  <meta name="theme-color" content="#f6f6f3">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="app.css">
+  <script src="app.js" type="module"></script>
+</head>
+<body>
+  <a class="skip-link" href="#top">Lewati ke isi</a>
+  <header class="topbar" hidden>
+    <div class="wrap topbar__row">
+      <a class="brand" href="#/">
+        <span class="brand__mark" aria-hidden="true"></span>
+        <span><strong>Ceklis Manajemen Perubahan</strong><small>BPS Kabupaten Parigi Moutong</small></span>
+      </a>
+      <nav class="mainnav" aria-label="Menu utama">
+        <a href="#/">Dasbor</a>
+        <a href="#/kalender">Kalender</a>
+        <a href="#/kegiatan">Kegiatan</a>
+        <a href="#/laporan">Laporan</a>
+        <a href="#/pengaturan">Pengaturan</a>
+      </nav>
+      <div class="who">
+        <span class="who__name" data-user></span>
+        <button class="btn btn--secondary btn--sm" type="button" data-logout>Keluar</button>
+      </div>
+    </div>
+  </header>
+  <main id="top" class="wrap" tabindex="-1"></main>
+  <p class="toast" role="status" aria-live="polite"></p>
+</body>
+</html>
